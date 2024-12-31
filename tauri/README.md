@@ -3,7 +3,7 @@
 ## Install
 To install all dependencies needed for Tauri
 ```
-# install tauri https://v2.tauri.app/start/
+# adapted from https://v2.tauri.app/start/
 
 # install rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
