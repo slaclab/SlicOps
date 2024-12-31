@@ -1,7 +1,28 @@
-# Tauri + Angular
+# Tauri
 
-This template should help get you started developing with Tauri and Angular.
+## Install
+To install all dependencies needed for Tauri
+```
+# install tauri https://v2.tauri.app/start/
 
-## Recommended IDE Setup
+# install rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+> default
+echo 'source "$HOME/.cargo/env' >> ~/.bashrc
 
-[VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) + [Angular Language Service](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template).
+# Additional tauri deps
+dnf install webkit2gtk4.1-devel \
+  openssl-devel \
+  curl \
+  wget \
+  file \
+  libappindicator-gtk3-devel \
+  librsvg2-devel \ 
+  nodejs
+dnf group install "c-development"
+
+## Development
+cd tauri
+npm install
+npm run tauri dev
+```
