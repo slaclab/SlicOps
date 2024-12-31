@@ -20,8 +20,11 @@ dnf install webkit2gtk4.1-devel \
   librsvg2-devel \ 
   nodejs
 dnf group install "c-development"
+npm install
+```
 
 ## Development
+```
 cd tauri
 npm install
 npm run tauri dev
