@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "edu.stanford.slac.slicops",
   "build": {
-    "beforeDevCommand": "npm run start",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "cd ~/src/slaclab/slicops/ui/ && npm run start",
+    "devUrl": "http://localhost:8080",
+    "beforeBuildCommand": "cd ~/src/slaclab/slicops/ui/ && npm run build",
     "frontendDist": "../dist/slicops/browser"
   },
   "app": {
