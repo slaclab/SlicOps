@@ -4,7 +4,6 @@
 // http://github.com/slaclab/slicops/LICENSE
 
 import { Component } from '@angular/core';
-import { AppDataService } from '../app-data.service';
 import { FormGroup, FormControl, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { APIService } from '../api.service';
@@ -12,17 +11,11 @@ import { APIService } from '../api.service';
 @Component({
     selector: 'app-screen',
     template: `
-<div class="container-fluid">
   <div class="row">
+    <div *ngIf="errorMessage" class="alert alert-warning">{{ errorMessage }}</div>
     <div class="col-sm-3 ">
 
       <form>
-<!--
-        <div class="mb-3">
-          <button type="button" (click)="echoCall()">Echo</button>
-          <p>{{ echoReply }}</p>
-        </div>
--->
         <div class="mb-3">
           <label class="form-label">Beam Path</label>
           <select class="form-select form-control-sm">
@@ -39,33 +32,17 @@ import { APIService } from '../api.service';
           <label class="form-label">PV</label>
           <input class="form-control form-control-sm" value="OTRS:LI21:291"/>
         </div>
-        <div class="form-check">
-          <input id="statsCheckbox" class="form-check-input" type="checkbox" value="" checked (click)="toggleStats()"/>
-          <label class="form-check-label" for="statsCheckbox">
-            Calculate Statistics
-          </label>
-        </div>
-        <div class="mb-3" *ngIf="showStats">
-          <label class="form-label">Curve Fit Method</label>
-          <select class="form-select form-control-sm">
-            <option *ngFor="let m of methods" [value]="m">{{ m }}</option>
-          </select>
-        </div>
-        <div class="mb-3"  *ngIf="showStats">
-          <div class="col">
-            <div class="row">
-              <div class="col-sm-2">
-                <label class="form-label">xSig</label>
-              </div>
-              <div class="col-sm-4">
-            <input class="form-control form-control-sm text-end" value="4.6" />
-              </div>
-              <div class="col-sm-2">
-            <label class="form-label">ySig</label>
-              </div>
-              <div class="col-sm-4">
-            <input class="form-control form-control-sm text-end" value="4.6" />
-              </div>
+
+        <div class="mb-3">
+          <div class="row">
+            <div class="col-sm-4">
+              <button [disabled]="isAcquiring" class="btn btn-primary" type="button" (click)="startAcquiringImages()">Start</button>
+            </div>
+            <div class="col-sm-4">
+              <button [disabled]="! isAcquiring" class="btn btn-danger" type="button" (click)="stopAcquiringImages()">Stop</button>
+            </div>
+            <div class="col-sm-4">
+              <button [disabled]="isAcquiring" class="btn btn-outline-dark" type="button" (click)="getSingleImage()">Single</button>
             </div>
           </div>
         </div>
@@ -74,20 +51,33 @@ import { APIService } from '../api.service';
     </div>
 
     <div class="col-sm-9 col-xxl-7">
-      <app-heatmap-with-lineouts [data]="heatmapData"></app-heatmap-with-lineouts>
+      <div *ngIf="image && image.raw_pixels.length">
+        <app-heatmap-with-lineouts [data]="image"></app-heatmap-with-lineouts>
+      </div>
     </div>
 
 
     <div class="col-sm-3 "></div>
-    <div style="margin-top: 3ex" class="col-sm-9">
+    <div *ngIf="image && image.raw_pixels.length" style="margin-top: 3ex" class="col-sm-9">
 
       <form>
         <div class="mb-3">
           <div class="row">
             <div class="col-sm-3">
-              <select class="form-select form-control-sm">
-                <option *ngFor="let cm of colormaps" [value]="cm">{{ cm }}</option>
+              <label class="form-label">Curve Fit Method</label>
+              <select class="form-select form-control-sm" (change)="selectCurveFit($event)">
+                <option *ngFor="let m of methods" [value]="m[0]">{{ m[1] }}</option>
               </select>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label">Color Map</label>
+              <select class="form-select form-control-sm">
+                <option *ngFor="let cm of colorMaps" [value]="cm">{{ cm }}</option>
+              </select>
+            </div>
+            <div class="col-sm-3"></div>
+            <div class="col-sm-3" style="margin-top: 24px">
+              <button class="btn btn-outline-dark" type="button">Select ROI</button>
             </div>
           </div>
         </div>
@@ -96,62 +86,150 @@ import { APIService } from '../api.service';
     </div>
 
   </div>
-</div>
     `,
     styles: [],
 })
 export class ScreenComponent {
-    heatmapData: number[][];
-    echoReply: string = "";
-    showStats = true;
-    beamPaths = [
-        'CU_HXR',
-        'CU_SXR',
-        'SC_DIAG0',
-        'SC_BSYD',
-        'SC_HXR',
-        'SC_SXR',
-    ];
+    readonly APP_NAME: string = 'screen';
+    image: any = null;
+    beamPaths: string[] = [];
     cameras = [
         'VCCB',
     ];
-    colormaps = [
-        'Inferno',
-        'Viridis',
-    ];
-    methods = [
-        'Gaussian',
-        'Assymetric',
-        'RMS raw',
-        'RMS cut peak',
-        'RMS cut area',
-        'RMS floor',
-    ];
-    bitdepth = [
-        8, 9, 10, 11, 12, 13, 14, 15, 16,
-    ];
+    colorMaps: string[] = [];
+    methods: any = [];
+    errorMessage: string = "";
+    isAcquiring: boolean = false;
+    interval: any = null;
+    curveFit = "gaussian";
 
-    constructor(dataService: AppDataService, private apiService: APIService) {
-        console.log("constructor ScreenComponent");
-        this.heatmapData = dataService.heatmapData;
+    constructor(private apiService: APIService) {
         this.apiService = apiService;
-    }
 
-    echoCall() {
-        console.log("echoCall");
-        this.apiService.call('echo', 'hello').subscribe({
+        this.apiService.call('init_app', {
+            app_name: this.APP_NAME,
+        }).subscribe({
             next: (result) => {
-                this.echoReply = result;
-                console.log('reply', result);
+                console.log('init_app result:', result);
+                //TODO(pjm): these details move to field editors
+                this.beamPaths = result.schema.constants.BeamPath.map((b: any) => b.name);
+                this.methods = result.schema.constants.CurveFitMethod;
+                this.colorMaps = result.schema.constants.ColorMap;
+                this.isAcquiringImages(() => {
+                    this.getImages();
+                });
             },
             error: (err) => {
-                this.echoReply = "error=" + err;
-                console.log('error', err);
+                this.handleError(err);
             },
         });
     }
 
-    toggleStats() {
-        this.showStats = ! this.showStats;
+    getImage(callback: Function | null) {
+        this.apiService.call('action', {
+            app_name: this.APP_NAME,
+            method: 'get_image',
+            curve_fit: this.curveFit,
+        }).subscribe({
+            next: (result) => {
+                this.image = result;
+                if (callback) {
+                    callback();
+                }
+            },
+            error: (err) => {
+                this.image = null;
+                this.handleError(err);
+            },
+        });
+    }
+
+    getImages() {
+        let ready = true;
+        this.interval = setInterval(() => {
+            if (ready) {
+                ready = false;
+                this.getImage(() => {
+                    ready = true;
+                });
+            }
+        }, 1000);
+    }
+
+    getSingleImage() {
+        if (this.isAcquiring) {
+            return;
+        }
+        this.acquireImages('start_button', () => {
+            this.getImage(() => {
+                this.stopAcquiringImages();
+            });
+        });
+    }
+
+    handleError(err: any) {
+        if (this.errorMessage === undefined) {
+            throw new Error(`Invalid this in handleError: ${this}`);
+        }
+        if (err && err.target instanceof WebSocket) {
+            err = "WebSocket connection to server failed";
+        }
+        this.errorMessage = err;
+    }
+
+    isAcquiringImages(callback: Function) {
+        //TODO(pjm): consolidate calling method w/errorMessage handling
+        this.errorMessage = "";
+        this.apiService.call('action', {
+            app_name: this.APP_NAME,
+            method: 'is_acquiring_images',
+        }).subscribe({
+            next: (result) => {
+                this.isAcquiring = result.is_acquiring_images;
+                if (result.is_acquiring_images) {
+                    callback();
+                }
+            },
+            error: (err) => {
+                this.handleError(err);
+            },
+        });
+    }
+
+    selectCurveFit(event: any) {
+        this.curveFit = event.target.value;
+    }
+
+    startAcquiringImages() {
+        this.acquireImages('start_button', () => {
+            this.isAcquiring = true;
+            this.getImages();
+        });
+    }
+
+    stopAcquiringImages() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        this.isAcquiring = false;
+        this.acquireImages('stop_button', null);
+    }
+
+    private acquireImages(button: string, callback: Function | null) {
+        this.errorMessage = "";
+        this.apiService.call('action', {
+            app_name: this.APP_NAME,
+            method: button,
+        }).subscribe({
+            next: (result) => {
+                if (callback) {
+                    callback();
+                }
+            },
+            error: (err) => {
+                this.handleError(err);
+            },
+        });
     }
 }
